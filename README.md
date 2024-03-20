@@ -1,4 +1,5 @@
 # 🚀 Data-Visualisation-of-Texas-Policing-Dataset
+![unnamed-chunk-13-1](https://github.com/Gauravonthemixx/Text-Analytics-of-TED-Talks/assets/91785440/3176e3f8-00a4-4f44-bfb0-46eea89f9bc0)
 
 ## :pencil: Description
 The project focuses on analyzing the Dallas Policing dataset to gain insights into law enforcement practices, crime trends, and demographic patterns within the state of Texas. Through data visualization and exploration, the project aims to understand the distribution of crimes, policing behavior towards subjects, racial and gender disparities within the police department, and other relevant factors influencing law enforcement dynamics.
