@@ -46,5 +46,6 @@ The project focuses on analyzing the Dallas Policing dataset to gain insights in
 ### Crime Hotspots: 
 * Crime intensity is higher in urban areas compared to suburban areas, highlighting geographical disparities in crime distribution.
   
+## Please Go through [Texas Policing Data- HLD.docx](https://github.com/Gauravonthemixx/Text-Analytics-of-TED-Talks/files/14670525/Texas.Policing.Data-.HLD.docx) for more info. 🔗
 
 
