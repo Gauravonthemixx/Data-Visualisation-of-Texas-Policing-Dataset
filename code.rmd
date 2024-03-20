@@ -1,0 +1,729 @@
+---
+title: "Data Visualization (MA304)-Report : 2213212"
+Author: "Gaurav"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-04-23"
+header-includes:
+  - \usepackage{hyperref}
+---
+
+```{r setup, include=FALSE,fig.margin=c(3,3,2, 2)}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(flexdashboard)
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(RColorBrewer)
+library(shiny)
+library(plotly)
+library(leaflet)
+library(ggmap)
+library(osmdata)
+
+
+theme_set(theme_classic())
+
+
+#=========================
+Data<- read.csv("/Users/gaurav/Desktop/37-00049_UOF-P_2016_prepped.csv")
+Data<- Data %>% filter(!row_number() %in% c(1))
+View(Data)
+```
+
+
+```{r,echo=FALSE,results='hide'}
+names(Data)
+```
+
+
+
+**INTRODUCTION**
+
+
+<p style="text-align: justify;">According to the department of public safety, the overall major crime rate in Texas for 2016, decreased 1.5% as compared to 2015 however the violent crime rate was increased by 5.6% as murder increased by 10.7% rate rate increased by 7.7% robbery increased by 3% and assault increased by 6.4%, an interesting fact about 2016 data was that the number of assault on police officers in 2016 also showed an increase of 10.2% from 2015.[1]
+
+The box-plot representing the data of years of force for officers and their hospitalisations during their duty shows that the mean of the years spent in the Force for the officers is 6. Further it illustrates that the officers who have more years of experience and have been working for over ten years, have been hospitalised because of some accidents while on duty. 2016 was the year when eight law-enforcement officers were also reportedly killed in the line of duty and nine had died in accidents while on duty [1]. </p>
+
+
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.margin=c(3,3,2, 2)}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+Data$OFFICER_YEARS_ON_FORCE <- as.numeric(Data$OFFICER_YEARS_ON_FORCE)
+
+Data_yof_oh <- Data %>%
+  select(OFFICER_YEARS_ON_FORCE, OFFICER_HOSPITALIZATION)
+
+Data_yof_count <- Data_yof_oh %>%
+  group_by(OFFICER_YEARS_ON_FORCE) %>%
+  count()
+
+p <- ggplot(Data_yof_oh, aes(x = OFFICER_HOSPITALIZATION, y = OFFICER_YEARS_ON_FORCE)) +
+  geom_boxplot(fill = "#2A9D8F", color = "black") +
+  labs(x = "Officer Hospitalization", y = "Years on Force") +
+  scale_y_continuous(breaks = Data_yof_count$n) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(color = "black", size = 12, face = "bold"),
+        strip.text = element_text(color = "black", size = 12, face = "bold"))
+
+ggplotly(p, tooltip = c("ymin", "lower", "middle", "upper", "ymax"))
+
+```
+
+<p style="text-align: justify;">It is to note that most of the crimes happen especially during the weekends and during the nights.</p> 
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.margin=c(3,3,2, 2)}
+# Created a heatmap of crime rates on days by hour
+Data$INCIDENT_DATE <- strptime(Data$INCIDENT_DATE, 
+                                        format = "%m/%d/%y")
+Data$INCIDENT_TIME <- format(as.POSIXct(Data$INCIDENT_TIME,
+                                                 format='%I:%M:%S %p'),
+                                      format="%H:%M:%S")
+
+Data$Weekday <- weekdays(Data$INCIDENT_DATE)
+
+Data$Hours <- format(strptime(Data$INCIDENT_TIME,"%H:%M:%S"),'%H')
+
+
+Data$Weekday <- factor(Data$Weekday, ordered = T, 
+                                levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+
+WeekdayCounts <- as.data.frame(table(Data$Weekday))
+WeekdayCounts$Var1 <- factor(WeekdayCounts$Var1, ordered = T, 
+                             levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+
+DayHourCount <- as.data.frame(table(Data$Weekday, Data$Hours))
+
+DayHourCount$Hour <- as.numeric(as.character(DayHourCount$Var2))
+
+DayHourCount$Var1 <- factor(DayHourCount$Var1, ordered = T, 
+                            levels = c("Monday", "Tuesday", "Wednesday", "Thursday","Friday", "Saturday","Sunday"))
+
+ggplot(DayHourCount, aes(x = Hour, y = Var1)) + 
+  geom_tile(aes(fill = Freq)) + scale_fill_gradient(name = "Total Crime rates", 
+                                                    low = "white", high = "red") +
+  labs(x = "Hours", y = "Days of the week", title = "Crimes rate on the days of the week by hour of the day")+
+ theme(axis.title.y = element_blank())
+```
+
+
+
+
+
+
+<p style="text-align: justify;">From the heat map above, several points can be noted, first, crime rate is the  most frequent on Sundays at 3:00 am. The lowest crime rate is observed on Wednesdays between 5:00 am and 8:00 am, which may be explained by the fact that this is when most individuals are either asleep or travelling to work, which reduces the chance for criminal behaviour. Finally, weekdays record high crime rates in the night hours. High crime rate frequency is also recorded at midnight and 02:00am. Such high crime rate at night may be linked to  social activities, increased alcohol consumption, and less police presence.
+
+</p> 
+
+
+**Policing behaviour towards subjects or crime offenders**
+
+<p style="text-align: justify;">In Texas, crime suspects are predominantly White males, although there is a significant number of Hispanics, Blacks, and Asians as crime suspects [3]. When it comes to policing, the law enforcement officers are seen to catch Black male subjects more often than the other racial groups. While many studies suggest that Black and Hispanic officers tend to be a bit more sensitive while policing but the White officers remain unaffected. [4]</p>
+
+<p style="text-align: justify;">We plotted a graph representing the distribution of top 5 Subject offences in the State in relation to the Subject race. This highlighted the count of Subjects of different races getting arrested for these 5 offences (APOWW, Assault/FV, Assault/public servant, Public Intoxication and Warrant hold) by the police. </p>
+
+
+
+
+
+
+```{r,echo=FALSE, warning=FALSE,message=FALSE,fig.margin=c(3,3,2, 2)}
+#subject offenses and if they got arrested or not by interesting subject races.
+library(dplyr)
+library(ggplot2)
+
+Data_filtered <- Data %>%
+  filter(SUBJECT_RACE %in% c("White", "Black", "Hispanic")) %>%
+  filter(SUBJECT_OFFENSE != "No Arrest") %>%
+  select(SUBJECT_OFFENSE, SUBJECT_RACE, SUBJECT_WAS_ARRESTED)
+
+top_offenses <- Data_filtered %>%
+  group_by(SUBJECT_OFFENSE) %>%
+  summarise(count = n()) %>%
+  top_n(5, count) %>%
+  select(SUBJECT_OFFENSE)
+Data_grouped <- Data_filtered %>%
+  filter(SUBJECT_OFFENSE %in% top_offenses$SUBJECT_OFFENSE) %>%
+  group_by(SUBJECT_OFFENSE, SUBJECT_RACE, SUBJECT_WAS_ARRESTED) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+ggplot(Data_grouped, aes(x = SUBJECT_OFFENSE, y = count, fill = SUBJECT_WAS_ARRESTED)) +
+  geom_bar(stat = "identity", position = "stack") +
+  facet_grid(rows = vars(SUBJECT_RACE)) +
+  labs(title = "Distribution of Arrests by Top 5 Subject Offenses and Subject Race",
+       x = "Subject Offense", y = "Count") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+	
+
+
+<p style="text-align: justify;">This bar graph clearly shows that the Blacks are majorly arrested for all the 5 offences as compared to the other groups of Hispanic and White Offenders. </p>
+ 
+<p style="text-align: justify;">The count of offences is also more in number for the Black subjects when compared to the rest.</p> 
+
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.margin=c(3,3,2, 2)}
+# Offense by Different Races of Subjects
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+Data_long <- Data %>% 
+  pivot_longer(cols = starts_with("SUBJECT_OFFENSE"), names_to = "offense_num", values_to = "offense") %>%
+  select(offense, SUBJECT_RACE)
+
+Data_race_offense <- Data_long %>% 
+  group_by(offense, SUBJECT_RACE) %>% 
+  summarize(count = n()) %>% 
+  ungroup()
+
+ggplot(Data_race_offense, aes(x = SUBJECT_RACE, y = count)) +
+  geom_point(color="#E76F51") +
+  labs(x = "Subject Race", y = "Count of Offenses",title="Offense by Different Races of Subjects") +
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+<p style="text-align: justify;">Interesting information about the racial distribution of crime in Dallas may be gained from the scatterplot. It shows that those who identify as Black commit the majority of crimes, followed by people who identify as Hispanic and White. On the other side, American Indians and Asians have the lowest rates of crime..</p> 
+
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.margin=c(3,3,2, 2)}
+# forces used on males and females of subjects
+library(tidyverse)
+
+force_cols <- paste0("TYPE_OF_FORCE_USED", 1:10)
+gender_col <- "SUBJECT_GENDER"
+cols_to_select <- c(force_cols, gender_col)
+force_data <- Data %>%
+  select(all_of(c(cols_to_select)))
+
+force_data[force_data == "" | force_data == " "] <- NA
+force_data_long <- force_data %>%
+  pivot_longer(cols = force_cols, names_to = "force_num", values_to = "force") %>%
+  select(force, gender = SUBJECT_GENDER)
+
+
+force_counts <- force_data_long %>%
+  count(force, gender, sort = TRUE, na.rm = TRUE) %>%
+  top_n(10)
+
+ggplot(force_counts, aes(x = force, y = n)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Force Type", y = "Count") +
+  facet_wrap(~ gender, nrow = 1, scales = "free_x") +
+  theme_bw() +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+
+
+
+
+<p style="text-align: justify;">This graph represents the type of force used by the officers on different genders of subjects while policing. This depicts verbal command as the most common force type used by the officers, on both the genders, among the rest. </p>
+
+**Racial Distribution within the Police Department**
+
+<p style="text-align: justify;">The majority of police officers across all the police departments and regions in Texas, are White males of more than 80%. The Hispanic males being the second largest group of officers across the departments. Also, the lower numbers of female officers in all racial groups is a concerning trend, as it raises questions about gender bias and discrimination in law enforcement.</p>
+
+
+
+
+
+
+
+
+```{r,echo=FALSE, message=FALSE,warning=FALSE,fig.margin=c(3,3,2, 2)}
+#I have plotted vertical bar graph to show males and females of different races.
+# Define UI
+ui <- fluidPage(
+  plotlyOutput("plot")
+)
+
+# Define server
+server <- function(input, output) {
+  
+  output$plot <- renderPlotly({
+    plot_data <- Data %>%
+      group_by(OFFICER_RACE, OFFICER_GENDER) %>%
+      summarize(count = n(),.groups = 'drop') %>%
+      group_by(OFFICER_RACE) %>%
+      mutate(percentage = count / sum(count) * 100)
+    
+    plot_ly(plot_data, x = ~OFFICER_RACE, y = ~percentage, color = ~OFFICER_GENDER,
+            type = "bar", hoverinfo = "text",
+            text = ~paste0(OFFICER_GENDER, ": ", count)) %>%
+      layout(title = "Distribution of Officers by Race and Gender",
+             xaxis = list(title = "Officer Race"),
+             yaxis = list(title = "Percentage of Officers"),
+             barmode = "stack",
+             showlegend = TRUE,
+             legend = list(title = list(text = "Gender")))
+  })
+}
+
+# Run the app
+shinyApp(ui, server)
+
+```
+
+
+
+
+
+
+
+
+<p style="text-align: justify;">This bar graph represents the distribution of race of officers within the department. The plot shows the majority of White males in the department and the Hispanic Officers as the next majority with the presence of other groups of officers.</p> 
+
+<p style="text-align: justify;">Furthermore the participation of officers from diverse groups and races is important too for fairness and representativeness. </p>
+	
+	
+	
+	
+	
+	
+
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,fig.margin=c(3,3,2, 2)}
+library(ggplot2)
+
+TIME_SERIES <- Data[, c("INCIDENT_DATE", "OFFICER_RACE", "SUBJECT_RACE")]
+TIME_SERIES$INCIDENT_YEAR <- format(as.Date(TIME_SERIES$INCIDENT_DATE), "%Y")
+
+TIME_SERIES$value <- 1
+
+agg_data <- aggregate(value ~ INCIDENT_YEAR + OFFICER_RACE + SUBJECT_RACE, data = TIME_SERIES, FUN = sum)
+
+table_data <- reshape(agg_data, timevar = "OFFICER_RACE", idvar = c("INCIDENT_YEAR", "SUBJECT_RACE"), direction = "wide")
+
+colnames(table_data) <- c("Year", "Asian", "Black", "Hispanic", "White")
+
+table_data[is.na(table_data)] <- 0
+
+ts_data <- ts(table_data[,2:5], start = c(min(table_data$Year), 1), frequency = 1)
+
+ggplot(data = data.frame(ts_data), aes(x = time(ts_data))) +
+  geom_smooth(aes(y = Asian, color = "Asian"), size = 1.2, se = FALSE) +
+  geom_smooth(aes(y = Black, color = "Black"), size = 1.2, se = FALSE) +
+  geom_smooth(aes(y = Hispanic, color = "Hispanic"), size = 1.2, se = FALSE) +
+  geom_smooth(aes(y = White, color = "White"), size = 1.2, se = FALSE) +
+  scale_color_manual(name = "Officer Race", 
+                     values = c("Asian" = "#E76F51", 
+                                "Black" = "#2A9D8F", 
+                                "Hispanic" = "#F4A261", 
+                                "White" = "#B5838D")) +
+  labs(x = "Officer Years on Force", y = "Number of Cases Handled", title = " Cases Handled by Races of Officers ") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12))
+
+```
+
+
+
+
+
+<p style="text-align: justify;">The time-series plot above, shows the number of cases handled by different races of officers with respect to the number of years that they have spent in the Force. It determines that the White officers with under 20 years of experience have handled the most number of cases, while the number of cases for Hispanic, Blacks and Asians remain significantly low. This distribution is quite important to consider as it has a lot of impact on not only the racial diversity in the department but also has a significant effect on the relationship of the department with different communities. Moreover, a diverse police force is more likely to showcase fairness, less bias and discrimination in the interactions with the citizens of diverse communities.  </p>
+
+**Gender Distribution within the Police Department**
+
+<p style="text-align: justify;">The majority of the officers in the police department across Texas is found to be male officers (89.9%), while only 10.1% of the force consists of women officers. </p>
+
+
+
+
+
+
+
+
+
+
+
+```{r,echo=FALSE,fig.margin=c(3,3,2, 2)}
+# I have plotted a pie chart of genders of Officers.
+gender_count <- Data %>%
+  count(OFFICER_GENDER)
+
+ggplot(gender_count, aes(x = "", y = n, fill = OFFICER_GENDER)) +
+  geom_bar(stat = "identity", width = 1, color = "White") +
+  coord_polar(theta = "y") +
+  scale_fill_manual(values = c("#6B8E23", "#FFD700")) +
+  theme_void() +
+  ggtitle("Percentage of Gender of Officers") +
+  theme(plot.title = element_text(hjust = 0.5, size = 20)) +
+  geom_text_repel(aes(label = paste0(sprintf("%.1f", n/sum(n)*100), "%")), 
+                  position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5)+
+  guides(fill=guide_legend(title=NULL))
+```
+
+
+
+
+
+
+
+<p style="text-align: justify;">This pie chart shows the distribution of males and females as officers in the department where officers are predominantly males. </p>
+
+<p style="text-align: justify;">Participation of all gender officers is also a very important matter when it comes to representation and leadership. This plot is used to compare the number of beats done by male and female officers during their years on Force. The results were very dramatic.</p> 
+
+
+
+
+
+
+
+
+```{r,echo=FALSE, message=FALSE,fig.margin=c(3,3,2, 2)}
+library(dplyr)
+library(ggplot2)
+
+Data_counts <- Data %>%
+  group_by(OFFICER_YEARS_ON_FORCE, OFFICER_GENDER) %>%
+  summarize(count_beats = n()) %>%
+  ungroup() %>%
+  arrange(OFFICER_YEARS_ON_FORCE)
+
+
+ggplot(Data_counts, aes(x = OFFICER_YEARS_ON_FORCE, y = count_beats, fill = OFFICER_GENDER)) +
+  geom_point(shape = 21, size = 3, stroke = 0.5) +
+  scale_fill_manual(values = c("#E76F51", "#2A9D8F")) +
+  labs(title="No of beats by officers during their years on Force",x = "Officer Years on Force", y = "Beats", fill = "Officer Gender") +
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+	
+	
+	
+	
+	
+	
+<p style="text-align: justify;">This scatter plot depicts that only a handful of the female officers even crossed 10 beat count and none above 50, while the male beat count remained exceptionally high.</p>
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+library(plotly)
+Data$OFFICER_YEARS_ON_FORCE <- as.numeric(Data$OFFICER_YEARS_ON_FORCE)
+
+p <- plot_ly(data = Data, x = ~OFFICER_YEARS_ON_FORCE, type = "histogram", 
+             marker = list(color = "#E76F51", line = list(color = "#101F33", width = 1))) %>%
+  layout(title = "The number of years on the force", xaxis = list(title = "Years on the force", 
+                                                                 tickformat = ".0f", 
+                                                                 titlefont = list(size = 18),
+                                                                 tickfont = list(size = 14)),
+         yaxis = list(title = "Frequency", 
+                      titlefont = list(size = 18),
+                      tickfont = list(size = 14)))
+
+p
+
+```
+
+
+
+
+From the above histogram plot, we can observe that the  officers with somewhere two years of experience on the force reaches a maximum. The histogram specifically shows that there are 341 cops with two years of experience. Moreover, it can be said that, after a few years, it's possible that many officers leave the police for a variety of reasons, including obtaining a new career, retiring, injured or being stressed out.
+
+
+
+
+
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE,fig.margin=c(3,3,2, 2)}
+# Plotted a heatmap which tells officer catching criminals of different Races
+Data_counts <- Data %>%
+  filter(OFFICER_RACE %in% c("Black", "Hispanic", "White")) %>%   
+  filter(SUBJECT_RACE %in% c("Black", "Hispanic", "White")) %>%   
+  group_by(OFFICER_RACE, SUBJECT_RACE) %>%
+  summarize(count = sum(!is.na(SUBJECT_RACE))) %>%
+  ungroup()
+
+ggplot(Data_counts, aes(x = OFFICER_RACE, y = SUBJECT_RACE, fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red") +
+  labs(title = "Officers Catching Criminals by Race",x = "Officer Race", y = "Subject Race", fill = "Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 20),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+
+
+```
+
+
+
+
+
+
+<p style="text-align: justify;">This graph shows that the majority of Black criminals were caught by white officers while the count for white offenders for white officers is comparatively low. Meanwhile, for black and hispanic officers, the count of white criminals caught is low.</p>
+
+<p style="text-align: justify;">To further reiterate the point we analysed a graph that compares the catching of criminals by the two officer genders. </p>
+
+
+
+
+
+
+
+```{r,echo=FALSE, message=FALSE,fig.margin=c(3,3,2, 2)}
+# Plot of heat map which tells officers catching criminal by Gender
+df_summary <- Data %>% 
+  group_by(OFFICER_GENDER, SUBJECT_GENDER) %>% 
+  filter(SUBJECT_GENDER %in% c("Female", "Male")) %>% 
+  summarise(count = n()) %>% 
+  ungroup()
+
+p <- ggplot(df_summary, aes(x = OFFICER_GENDER, y = SUBJECT_GENDER, fill = count)) +
+  geom_tile() +
+  labs(title = "Officers Catching Criminals by Gender",
+       x = "Officer Gender", y = "Subject Gender") +
+  theme(plot.title = element_text(hjust = 0.5, size = 20),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 16))
+
+#ggplotly is used to make it interactive.
+ggplotly(p, tooltip = "count")
+```
+
+
+
+
+
+
+
+
+
+
+<p style="text-align: justify;">Through this heat-map, it is evident that the number of cases handled or subjects arrested by male officers for male and female subjects is the highest while female officers arresting female and male subjects are significantly low. </p>
+
+
+<p style="text-align: justify;">The table below lists down the top 10 offences and their total count in the year of 2016 in the state of Texas.</p>
+
+
+
+
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE,fig.margin=c(3,3,2, 2)}
+# Table showimg top 10 Subject Offenses
+library(tidyr)
+library(dplyr)
+
+Data_long <- Data %>% 
+  pivot_longer(cols = starts_with("SUBJECT_OFFENSE"), names_to = "offense_num", values_to = "offense") %>%
+  select(offense)
+Data_offense_count <- Data_long %>% 
+  group_by(offense) %>% 
+  count() %>%
+  arrange(desc(n))
+head(Data_offense_count, 10)
+
+
+```
+
+
+
+
+
+
+
+<p style="text-align: justify;">The map below shows the intensity of crime across various locations in Dallas. it is shown that outskirts of Texas has less frequency rate of crime whereas it is much higher in the city. Hence this highlights the only a few number of crimes have been reported in the suburbs areas of Texas and that crime is more prevalent in the city of Texas.</p>
+
+
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE, warning=FALSE,fig.margin=c(3,3,2, 2)}
+# plotting crime rate frequency 
+Dallas <- get_map( getbb('dallas'), source="stamen")
+Data$LOCATION_LONGITUDE <- as.double(Data$LOCATION_LONGITUDE)
+Data$LOCATION_LATITUDE <- as.double(Data$LOCATION_LATITUDE)
+
+LatLonCounts <- as.data.frame(table(round(Data$LOCATION_LONGITUDE,2), round(Data$LOCATION_LATITUDE,2)))
+
+
+LatLonCounts$Long <- as.numeric(as.character(LatLonCounts$Var1))
+LatLonCounts$Lat <- as.numeric(as.character(LatLonCounts$Var2))
+
+ggmap(Dallas) + geom_point(data = LatLonCounts, 
+                            aes(x = Long, y = Lat, color = Freq, size = Freq)) +
+  labs(title = "Crime rate frequency in Dallas, Texas") +
+  scale_color_gradient(low = "#2A9D8F", high = "#E76F51")
+
+```
+
+
+
+
+
+
+
+
+<p style="text-align: justify;">The leaflet map below provides a visual of crime data in Texas based on the reason of incident, date and time of crime, which is useful in identifying the patterns and trends of the incidents. The incidents are shown on a map using latitude and longitude coordinates, that can be used to pinpoint hotspots or locations of crime. Each circle marker of different color contains further details about the incident, such as the cause of the incident, the date it happened, and the time it happened. </p>
+
+
+
+
+
+
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.margin=c(3,3,2, 2)}
+library(htmltools)
+library(dplyr)
+library(lubridate)
+
+Data$LOCATION_LONGITUDE <- as.numeric(Data$LOCATION_LONGITUDE)
+Data$LOCATION_LATITUDE <- as.numeric(Data$LOCATION_LATITUDE)
+
+pal <- colorFactor(
+  palette = "Set1",
+  domain = Data$INCIDENT_REASON
+)
+
+leaflet(Data) %>%
+  addProviderTiles(provider = "OpenStreetMap.Mapnik") %>%
+  addCircleMarkers(
+    lng = ~LOCATION_LONGITUDE,
+    lat = ~LOCATION_LATITUDE,
+    popup = ~paste0("<b>Reason: </b>", INCIDENT_REASON, "<br>",
+                    "<b>Date: </b>", format(as.Date(INCIDENT_DATE, "%m/%d/%Y"), "%d/%m/"), year(as.Date(INCIDENT_DATE, "%m/%d/%Y")), "<br>",
+                    "<b>Time: </b>", format(as.POSIXct(INCIDENT_TIME, format = "%H:%M:%S"), "%I:%M %p")),
+    radius = 5,
+    color = ~pal(INCIDENT_REASON),
+    fillOpacity = 0.8
+  ) %>%
+  addLegend(
+    pal = pal,
+    values = ~INCIDENT_REASON,
+    title = "Incident Reason",
+    position = "bottomright",
+    opacity = 1,
+    labFormat = labelFormat(suffix = ":")
+  ) %>%
+  addControl(html = '<a href="https://stamen.com/">Map tiles by Stamen Design</a> | <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>', position = "bottomleft")
+
+```
+
+
+
+
+
+
+
+
+**Conclusion** 
+
+<p style="text-align: justify;">By analysing data and investigating through various parameters like the Subject demographics, police department demographics, arrests, offences, and type of force used, etc. we gained a lot of insights into the state of law enforcement of the state of Texas. This not only highlights the alleged biases within the law system and the diverse communities of the State but it also emphasises on the need to identify areas of improvement within the system and the potential solutions to tackle the issues of injustice and discrimination. 
+The biases of race can be seen both within the department and towards the criminal subjects whereas the biases towards gender is prevalent in the system itself. By studying extensively, the data on all these parameters, one can also understand the root causes for the increase in the number of criminal offences every year. </p>
+
+
+
+
+
+
+
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE,fig.margin=c(3,3,2, 2)}
+#created a treemap of top 10 Subject Description in Subject Gender
+library(ggplot2)
+library(treemap)
+library(treemapify)
+
+Data_male <- Data %>% filter(SUBJECT_GENDER == "Male" & SUBJECT_DESCRIPTION != "Unknown" & SUBJECT_DESCRIPTION != "Null")
+Data_female <- Data %>% filter(SUBJECT_GENDER == "Female" & SUBJECT_DESCRIPTION != "Unknown" & SUBJECT_DESCRIPTION != "Null")
+
+top_male_desc <- Data_male %>% group_by(SUBJECT_DESCRIPTION) %>% summarise(count = n()) %>% top_n(10, count)
+top_female_desc <- Data_female %>% group_by(SUBJECT_DESCRIPTION) %>% summarise(count = n()) %>% top_n(10, count)
+
+top_desc <- bind_rows(mutate(top_male_desc, Gender = "Male"), mutate(top_female_desc, Gender = "Female"))
+
+ggplot(top_desc, aes(area = count, fill = Gender, label = SUBJECT_DESCRIPTION)) +
+  geom_treemap() +
+  geom_treemap_text(colour = "white") +
+  labs(title = "Top 10 Subject Descriptions Count by Gender", fill = "Gender") +
+  theme_void()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+```
+
+
+
+
+
+
+
+
+
+<p style="text-align: justify;">The above graph shows the top 10 subject descriptions Count according to their gender. This clearly states mental instability in the females to be the most common description and Alcohol consumption for the male subjects. 
+This calls our attention towards the root issue and the need for awareness that could lead to a social change. </p
+
+
+
+**References**
+#References
+
+<p style="text-align: justify;">
+
+[1] Uniform Crime Reporting (UCR) Bureau Crime Records Service Law ‘Enforcement Support 2016 UCR Data Collection: Executive summary’. Uniform Crime Reporting (UCR) Bureau, Texas. Available at: https://www.dps.texas.gov/sites/default/files/documents/crimereports/16/executivesummary.pdf [Accessed at 22 April 2023]
+
+[2] Luh, EM 2020, ‘Not So Black and White: Uncovering Racial Bias from Systematically Misreported Trooper Reports’. Available at: https://elizluh.github.io/files/highwaybias.pdf [Accessed at 22 April 2023]
+
+[3] Kera, CC 2021, ‘Police In Texas Most Likely To Search Latinos, But Most Often Find Contraband On Whites’, ‘Houston Public Media’ 3 June, [Accessed at 23 April 2023], Available at: https://www.houstonpublicmedia.org/articles/news/criminal-justice/2021/06/03/399704/report-police-in-texas-most-likely-to-search-latinos-but-most-often-find-contraband-on-whites/.
+
+[4] Luh, EM 2020, ‘Essays on Disparate Policing and Racial Bias’, ​​University of Houston. Available at: https://uh-ir.tdl.org/bitstream/handle/10657/7857/LUH-DISSERTATION-2020.pdf?sequence=1&isAllowed=y [Accessed at 22 April 2023].
+
+[5] Collier, Dhillon 2022, ‘Few women in supervisory roles within Department of Public Safety, records show’ ‘Ksat News’ 21 November, [Accessed at 23 April 2023], Available at: https://www.ksat.com/news/ksat-investigates/2022/11/21/few-women-in-supervisory-roles-within-department-of-public-safety-records-show/. </p>
+
+
+
